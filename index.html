@@ -4,29 +4,114 @@
     <title>题目批改助手</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial; max-width: 500px; margin: 0 auto; padding: 20px; text-align: center; }
-        .upload-box { border: 2px dashed #1890ff; border-radius: 10px; padding: 40px 20px; margin: 20px 0; background: #f0f8ff; cursor: pointer; }
-        button { background: #1890ff; color: white; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #result { margin-top: 20px; padding: 15px; border-radius: 6px; text-align: left; }
-        .success { background: #f6ffed; border: 1px solid #b7eb8f; }
-        .error { background: #fff2f0; border: 1px solid #ffccc7; color: #a8071a; }
-        .loading { color: #1890ff; margin: 10px 0; }
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            text-align: center; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 { 
+            color: #1890ff; 
+            margin-bottom: 10px;
+        }
+        .upload-area { 
+            border: 3px dashed #1890ff; 
+            border-radius: 10px; 
+            padding: 40px 20px; 
+            margin: 20px 0; 
+            background: #f0f8ff; 
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #096dd9;
+            background: #e6f7ff;
+        }
+        button { 
+            background: linear-gradient(135deg, #52c41a, #389e0d);
+            color: white; 
+            border: none; 
+            padding: 15px 40px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 18px;
+            font-weight: bold;
+            width: 100%;
+            transition: all 0.3s ease;
+            margin: 10px 0;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(82, 196, 26, 0.4);
+        }
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        #result { 
+            margin-top: 20px; 
+            padding: 25px; 
+            background: #f6ffed; 
+            border: 2px solid #b7eb8f; 
+            border-radius: 10px; 
+            text-align: left; 
+            white-space: pre-wrap;
+            line-height: 1.6;
+            display: none;
+        }
+        .loading { 
+            color: #1890ff; 
+            margin: 20px 0; 
+            font-size: 16px;
+            display: none;
+        }
+        .success { display: block; }
+        .file-info {
+            background: #e6f7ff;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <h2>📸 题目批改助手</h2>
-    
-    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
-        <p>点击选择图片或拍照</p>
-        <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <div class="container">
+        <h1>📸 智能题目批改助手</h1>
+        <p>拍照上传数学题目，AI自动批改并给出详细解析</p>
+        
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <div style="font-size: 48px; margin-bottom: 10px;">📁</div>
+            <h3>点击选择图片或拍照</h3>
+            <p>支持 JPG、PNG 格式的数学题图片</p>
+        </div>
+        
+        <input type="file" id="fileInput" accept="image/*" capture="camera" style="display:none">
+        
+        <div class="file-info" id="fileInfo">
+            ✅ 已选择文件: <span id="fileName"></span>
+        </div>
+        
+        <button onclick="submitPhoto()" id="submitBtn" disabled>🎯 开始智能批改</button>
+        
+        <div id="loading" class="loading">
+            <div style="font-size: 48px; margin-bottom: 10px;">⏳</div>
+            <div>AI正在认真批改中，请稍候...</div>
+        </div>
+        
+        <div id="result"></div>
     </div>
-
-    <button onclick="submitPhoto()" id="submitBtn" disabled>开始批改</button>
-    
-    <div id="loading" class="loading" style="display:none">AI正在分析题目...</div>
-    
-    <div id="result"></div>
 
     <script>
         const CONFIG = {
@@ -38,9 +123,15 @@
 
         let currentFile = null;
 
+        // 文件选择处理
         document.getElementById('fileInput').addEventListener('change', function(e) {
             currentFile = e.target.files[0];
-            document.getElementById('submitBtn').disabled = !currentFile;
+            if (currentFile) {
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('fileInfo').style.display = 'block';
+                document.getElementById('fileName').textContent = currentFile.name + ' (' + (currentFile.size / 1024).toFixed(1) + ' KB)';
+                console.log('✅ 已选择文件:', currentFile.name);
+            }
         });
 
         async function submitPhoto() {
@@ -50,17 +141,18 @@
             }
 
             console.log('🚀 开始批改流程...');
+            
+            // 显示加载状态
             document.getElementById('loading').style.display = 'block';
-            document.getElementById('result').innerHTML = '';
-            document.getElementById('result').className = '';
+            document.getElementById('result').style.display = 'none';
             document.getElementById('submitBtn').disabled = true;
 
             try {
-                // 转换图片为base64
+                console.log('📷 转换图片为Base64...');
                 const base64Image = await fileToBase64(currentFile);
                 console.log('✅ 图片转换完成');
 
-                // 方案1：使用文本描述图片，不直接发送图片
+                // 准备API请求
                 const requestBody = {
                     "bot_id": CONFIG.BOT_ID,
                     "user_id": CONFIG.USER_ID,
@@ -69,12 +161,20 @@
                         {
                             "role": "user",
                             "content_type": "text",
-                            "content": "我上传了一张数学题图片，请帮我批改并给出详细解答步骤"
+                            "content": "请仔细批改这张数学题图片，给出详细的解题步骤、正确答案和批改意见"
+                        },
+                        {
+                            "role": "user",
+                            "content_type": "image",
+                            "content": base64Image
                         }
                     ]
                 };
 
-                console.log('📡 发送API请求...', requestBody);
+                console.log('📡 发送API请求...', { 
+                    bot_id: requestBody.bot_id,
+                    has_image: true 
+                });
 
                 const response = await fetch(CONFIG.API_URL, {
                     method: 'POST',
@@ -88,47 +188,43 @@
                 console.log('✅ API响应状态:', response.status);
 
                 if (!response.ok) {
-                    throw new Error(`API请求失败: ${response.status}`);
+                    throw new Error(`请求失败: ${response.status}`);
                 }
 
                 const data = await response.json();
-                console.log('📨 完整API响应:', data);
+                console.log('📨 API完整响应:', data);
 
-                // 分析响应数据
+                // 处理响应
                 if (data.messages && data.messages.length > 0) {
-                    let resultContent = '';
+                    // 查找AI的回复
+                    const assistantMessage = data.messages.find(msg => 
+                        msg.role === 'assistant' && msg.content
+                    );
                     
-                    for (const msg of data.messages) {
-                        console.log('检查消息:', msg);
-                        if (msg.content && msg.role === 'assistant') {
-                            resultContent = msg.content;
-                            break;
-                        }
-                    }
-                    
-                    if (resultContent) {
-                        document.getElementById('result').innerHTML = resultContent;
-                        document.getElementById('result').className = 'success';
+                    if (assistantMessage && assistantMessage.content.trim()) {
+                        document.getElementById('result').innerHTML = assistantMessage.content;
+                        document.getElementById('result').style.display = 'block';
                         console.log('🎉 成功显示批改结果');
                     } else {
-                        document.getElementById('result').innerHTML = 
-                            '收到回复但无法解析内容，请重试';
-                        document.getElementById('result').className = 'error';
+                        document.getElementById('result').innerHTML = '🤔 AI已处理完成，但返回内容为空\n\n这可能是因为：\n• 图片识别困难\n• 题目类型不支持\n• 网络传输问题\n\n请尝试更换更清晰的图片重试。';
+                        document.getElementById('result').style.display = 'block';
                     }
                 } else {
-                    throw new Error('API返回空消息');
+                    document.getElementById('result').innerHTML = '❌ 未收到有效回复\n\nAPI返回空数据，请检查：\n1. 智能体工作流配置\n2. 输出变量设置\n3. 网络连接状态';
+                    document.getElementById('result').style.display = 'block';
                 }
 
             } catch (error) {
                 console.error('❌ 错误:', error);
-                document.getElementById('result').innerHTML = `批改失败: ${error.message}`;
-                document.getElementById('result').className = 'error';
+                document.getElementById('result').innerHTML = '❌ 批改失败\n\n错误信息: ' + error.message + '\n\n请检查网络连接或稍后重试。';
+                document.getElementById('result').style.display = 'block';
             } finally {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('submitBtn').disabled = false;
             }
         }
 
+        // Base64转换函数
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
