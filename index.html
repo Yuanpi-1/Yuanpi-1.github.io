@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>题目批改助手</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial; max-width: 500px; margin: 0 auto; padding: 20px; text-align: center; }
+        .upload-box { border: 2px dashed #1890ff; border-radius: 10px; padding: 40px 20px; margin: 20px 0; background: #f0f8ff; cursor: pointer; }
+        button { background: #1890ff; color: white; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #result { margin-top: 20px; padding: 15px; border-radius: 6px; text-align: left; }
+        .success { background: #f6ffed; border: 1px solid #b7eb8f; }
+        .error { background: #fff2f0; border: 1px solid #ffccc7; color: #a8071a; }
+        .loading { color: #1890ff; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h2>📸 题目批改助手</h2>
+    
+    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+        <p>点击选择图片或拍照</p>
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+    </div>
+
+    <button onclick="submitPhoto()" id="submitBtn" disabled>开始批改</button>
+    
+    <div id="loading" class="loading" style="display:none">AI正在分析题目...</div>
+    
+    <div id="result"></div>
+
+    <script>
+        const CONFIG = {
+            BOT_ID: '7566545824629522447',
+            USER_ID: '123456789',
+            API_URL: 'https://api.coze.cn/v3/chat',
+            API_KEY: 'pat_TMFflnHj9SrbJg3ICQrq2QBFKSHLkxpy9krKxagLPjp2US7Oe7WN9srYl96tB079'
+        };
+
+        let currentFile = null;
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            currentFile = e.target.files[0];
+            document.getElementById('submitBtn').disabled = !currentFile;
+        });
+
+        async function submitPhoto() {
+            if (!currentFile) {
+                alert('请先选择图片');
+                return;
+            }
+
+            console.log('🚀 开始批改流程...');
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('result').className = '';
+            document.getElementById('submitBtn').disabled = true;
+
+            try {
+                // 转换图片为base64
+                const base64Image = await fileToBase64(currentFile);
+                console.log('✅ 图片转换完成');
+
+                // 方案1：使用文本描述图片，不直接发送图片
+                const requestBody = {
+                    "bot_id": CONFIG.BOT_ID,
+                    "user_id": CONFIG.USER_ID,
+                    "stream": false,
+                    "additional_messages": [
+                        {
+                            "role": "user",
+                            "content_type": "text",
+                            "content": "我上传了一张数学题图片，请帮我批改并给出详细解答步骤"
+                        }
+                    ]
+                };
+
+                console.log('📡 发送API请求...', requestBody);
+
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${CONFIG.API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                console.log('✅ API响应状态:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('📨 完整API响应:', data);
+
+                // 分析响应数据
+                if (data.messages && data.messages.length > 0) {
+                    let resultContent = '';
+                    
+                    for (const msg of data.messages) {
+                        console.log('检查消息:', msg);
+                        if (msg.content && msg.role === 'assistant') {
+                            resultContent = msg.content;
+                            break;
+                        }
+                    }
+                    
+                    if (resultContent) {
+                        document.getElementById('result').innerHTML = resultContent;
+                        document.getElementById('result').className = 'success';
+                        console.log('🎉 成功显示批改结果');
+                    } else {
+                        document.getElementById('result').innerHTML = 
+                            '收到回复但无法解析内容，请重试';
+                        document.getElementById('result').className = 'error';
+                    }
+                } else {
+                    throw new Error('API返回空消息');
+                }
+
+            } catch (error) {
+                console.error('❌ 错误:', error);
+                document.getElementById('result').innerHTML = `批改失败: ${error.message}`;
+                document.getElementById('result').className = 'error';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('submitBtn').disabled = false;
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>
