@@ -4,46 +4,14 @@
     <title>题目批改助手</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 500px;
-            margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-        }
-        .upload-box {
-            border: 2px dashed #1890ff;
-            border-radius: 10px;
-            padding: 40px 20px;
-            margin: 20px 0;
-            background: #f0f8ff;
-        }
-        button {
-            background: #1890ff;
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 10px;
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        #result {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f6ffed;
-            border: 1px solid #b7eb8f;
-            border-radius: 6px;
-            text-align: left;
-        }
-        .loading {
-            color: #1890ff;
-            margin: 10px 0;
-        }
+        body { font-family: Arial; max-width: 500px; margin: 0 auto; padding: 20px; text-align: center; }
+        .upload-box { border: 2px dashed #1890ff; border-radius: 10px; padding: 40px 20px; margin: 20px 0; background: #f0f8ff; cursor: pointer; }
+        button { background: #1890ff; color: white; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #result { margin-top: 20px; padding: 15px; border-radius: 6px; text-align: left; }
+        .success { background: #f6ffed; border: 1px solid #b7eb8f; }
+        .error { background: #fff2f0; border: 1px solid #ffccc7; color: #a8071a; }
+        .loading { color: #1890ff; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -51,17 +19,16 @@
     
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
         <p>点击选择图片或拍照</p>
-        <input type="file" id="fileInput" accept="image/*" capture="camera" style="display:none">
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
     </div>
 
     <button onclick="submitPhoto()" id="submitBtn" disabled>开始批改</button>
     
-    <div id="loading" class="loading" style="display:none">批改中...</div>
+    <div id="loading" class="loading" style="display:none">AI正在分析题目...</div>
     
     <div id="result"></div>
 
     <script>
-        // 配置信息
         const CONFIG = {
             BOT_ID: '7566545824629522447',
             USER_ID: '123456789',
@@ -69,82 +36,112 @@
             API_KEY: 'pat_TMFflnHj9SrbJg3ICQrq2QBFKSHLkxpy9krKxagLPjp2US7Oe7WN9srYl96tB079'
         };
 
-        // 监听文件选择
+        let currentFile = null;
+
         document.getElementById('fileInput').addEventListener('change', function(e) {
-            document.getElementById('submitBtn').disabled = !e.target.files[0];
+            currentFile = e.target.files[0];
+            document.getElementById('submitBtn').disabled = !currentFile;
         });
 
         async function submitPhoto() {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) {
+            if (!currentFile) {
                 alert('请先选择图片');
                 return;
             }
 
-            // 显示加载中
+            console.log('🚀 开始批改流程...');
             document.getElementById('loading').style.display = 'block';
             document.getElementById('result').innerHTML = '';
+            document.getElementById('result').className = '';
             document.getElementById('submitBtn').disabled = true;
 
             try {
                 // 转换图片为base64
-                const base64Image = await fileToBase64(file);
-                
-                // 调用扣子API
+                const base64Image = await fileToBase64(currentFile);
+                console.log('✅ 图片转换完成');
+
+                // 方案1：使用扣子平台推荐的消息格式
+                const requestBody = {
+                    "bot_id": CONFIG.BOT_ID,
+                    "user_id": CONFIG.USER_ID,
+                    "stream": false,
+                    "additional_messages": [
+                        {
+                            "role": "user",
+                            "content_type": "text",
+                            "content": "请仔细批改这张图片中的数学题目，给出详细的解题步骤和正确答案"
+                        },
+                        {
+                            "role": "user",
+                            "content_type": "image", 
+                            "content": base64Image
+                        }
+                    ]
+                };
+
+                console.log('📡 发送API请求...', requestBody);
+
                 const response = await fetch(CONFIG.API_URL, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${CONFIG.API_KEY}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        "bot_id": CONFIG.BOT_ID,
-                        "user_id": CONFIG.USER_ID,
-                        "stream": false,
-                        "additional_messages": [
-                            {
-                                "role": "user",
-                                "content_type": "object_string",
-                                "content": JSON.stringify([
-                                    { "type": "text", "text": "请批改这张图片中的题目" },
-                                    { "type": "image", "file_url": base64Image }
-                                ])
-                            }
-                        ]
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
+                console.log('✅ API响应状态:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`API请求失败: ${response.status}`);
+                }
+
                 const data = await response.json();
-                
-                // 显示结果
+                console.log('📨 完整API响应:', data);
+
+                // 分析响应数据
                 if (data.messages && data.messages.length > 0) {
-                    let resultText = '';
-                    data.messages.forEach(msg => {
-                        if (msg.content) {
-                            resultText += msg.content + '<br><br>';
+                    // 尝试不同的消息格式
+                    let resultContent = '';
+                    
+                    for (const msg of data.messages) {
+                        console.log('检查消息:', msg);
+                        if (msg.content && (msg.role === 'assistant' || msg.type === 'answer')) {
+                            resultContent = msg.content;
+                            break;
                         }
-                    });
-                    document.getElementById('result').innerHTML = resultText || '批改完成！';
+                    }
+                    
+                    if (resultContent) {
+                        document.getElementById('result').innerHTML = resultContent;
+                        document.getElementById('result').className = 'success';
+                        console.log('🎉 成功显示批改结果');
+                    } else {
+                        // 如果找不到具体内容，显示原始数据用于调试
+                        document.getElementById('result').innerHTML = 
+                            '收到回复但格式不匹配，原始数据:<br><pre>' + JSON.stringify(data.messages, null, 2) + '</pre>';
+                        document.getElementById('result').className = 'error';
+                    }
                 } else {
-                    document.getElementById('result').innerHTML = '批改完成！';
+                    throw new Error('API返回空消息');
                 }
 
             } catch (error) {
-                document.getElementById('result').innerHTML = '批改失败，请重试';
-                console.error('错误:', error);
+                console.error('❌ 错误:', error);
+                document.getElementById('result').innerHTML = `批改失败: ${error.message}`;
+                document.getElementById('result').className = 'error';
             } finally {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('submitBtn').disabled = false;
             }
         }
 
-        // 图片转base64
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.readAsDataURL(file);
                 reader.onload = () => resolve(reader.result);
                 reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
             });
         }
     </script>
